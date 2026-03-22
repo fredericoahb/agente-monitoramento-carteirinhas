@@ -50,23 +50,35 @@ jobs:
           PGPASSWORD=postgres psql -h localhost -U postgres -d carteirinhas_db -f database/schema.sql
           PGPASSWORD=postgres psql -h localhost -U postgres -d carteirinhas_db -f database/seeds.sql
 
-      - name: Test backend starts
+      - name: Start backend
         run: |
           cd backend
           echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/carteirinhas_db" > .env
-          timeout 10 uvicorn app.main:app --host 0.0.0.0 --port 8000 &
-          sleep 5
-          curl -f http://localhost:8000/health || exit 1
-          echo "Backend OK"
+          nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+          echo "Waiting for backend..."
+          for i in $(seq 1 15); do
+            curl -s http://localhost:8000/health && break
+            sleep 2
+          done
 
-      - name: Test API processing
+      - name: Test API endpoints
         run: |
-          curl -f -X POST http://localhost:8000/api/processar || exit 1
-          echo "Processing OK"
-          curl -f http://localhost:8000/api/resumo || exit 1
-          echo "Resumo OK"
-          curl -f http://localhost:8000/api/alertas || exit 1
-          echo "Alertas OK"
+          echo "=== Health ==="
+          curl -f http://localhost:8000/health
+          echo ""
+          echo "=== Processar ==="
+          curl -f -X POST http://localhost:8000/api/processar
+          echo ""
+          echo "=== Resumo ==="
+          curl -f http://localhost:8000/api/resumo
+          echo ""
+          echo "=== Alertas ==="
+          curl -f "http://localhost:8000/api/alertas?limit=5"
+          echo ""
+          echo "=== Empresas ==="
+          curl -f http://localhost:8000/api/empresas
+          echo ""
+          echo "All API tests passed!"
 
       - name: Install frontend dependencies
         run: |
